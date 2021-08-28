@@ -1,0 +1,23 @@
+{
+    "name": "myapp",
+    "git_ns": "{{cookiecutter.name}}-group",
+    "lname": "{{cookiecutter.name|lower}}",
+    "eggname": "{{cookiecutter.lname}}",
+    "infra_domain": "example.com",
+    "simple_docker_image": "{{cookiecutter.git_ns.split('/')[0].lower()}}/{{cookiecutter.lname}}",
+    "py_ver": "3.8",
+    "with_node": "y",
+    "node_version": "lts/*",
+    "git_server": "gitlab.{{cookiecutter.infra_domain}}",
+    "git_project_server": "{{cookiecutter.git_server}}",
+    "git_project": "{{cookiecutter.lname}}",
+    "git_scheme": "https",
+    "git_user": "",
+    "git_project_url": "{{cookiecutter.git_scheme}}://{%if cookiecutter.git_user%}{{cookiecutter.git_user}}@{%endif%}{{cookiecutter.git_project_server}}/{{cookiecutter.git_ns}}/{{cookiecutter.git_project}}",
+    "out_dir": ".",
+    "docker_registry": "",
+    "app_type": "simplecompose",
+    "ck_type": "{{cookiecutter.app_type}}",
+    "docker_image": "{%if cookiecutter.docker_registry%}{{cookiecutter.docker_registry}}/{%endif%}{{cookiecutter.simple_docker_image}}",
+    "base_image": "corpusops/ubuntu-bare:20.04"
+}

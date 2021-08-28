@@ -1,0 +1,11 @@
+/local
+/venv
+/aws/credentials
+.terraform*
+/.env*
+/lib/*
+!*.dist
+/data/*
+!/lib/.empty
+/node_modules/
+.bash_history
