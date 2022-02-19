@@ -53,8 +53,8 @@ ARG REQUIREMENTS=requirements/requirements.txt requirements/requirements-dev.txt
 ENV REQUIREMENTS=$REQUIREMENTS
 ADD --chown=app:app lib/ lib/
 ADD --chown=app:app src/ src/
-ADD --chown=app:app *.py *txt *md ./
-ADD --chown=app:app $REQUIREMENTS requirements/
+ADD --chown=app:app *.py *txt *md *in ./
+ADD --chown=app:app requirements/requirement*txt requirements/
 RUN bash -c 'set -e \
   && for i in / /usr /usr/local;do \
   ln -fsv $(which python${PY_VER}) $i/bin/python;done \

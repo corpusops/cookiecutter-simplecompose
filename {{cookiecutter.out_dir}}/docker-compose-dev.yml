@@ -12,6 +12,8 @@ services:
     - "./bin:/w/bin"
     - "./git:/w/.git"
     - "./setup.py:/w/setup.py"
+    - "./setup.cfg:/w/setup.cfg"
+    - "./tox.ini:/w/tox.ini"
 {% if cookiecutter.with_node %}
     - "./node_modules:/w/node_modules"
     - "./.nvmrc:/w/.nvmrc"

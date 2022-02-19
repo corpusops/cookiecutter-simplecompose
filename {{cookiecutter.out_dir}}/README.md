@@ -22,3 +22,9 @@ In dev, with scripts mounted as volumes
 ```bash
 COMPOSE_FILE="docker-compose.yml:docker-compose-dev.yml" docker-compose run --rm app
 ```
+
+## run tests
+```bash
+docker-compose exec app tox
+```
+

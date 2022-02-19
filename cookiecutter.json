@@ -1,5 +1,7 @@
 {
     "name": "myapp",
+    "author": "foo",
+    "email": "foo@org.com",
     "git_ns": "{{cookiecutter.name}}-group",
     "lname": "{{cookiecutter.name|lower}}",
     "eggname": "{{cookiecutter.lname}}",

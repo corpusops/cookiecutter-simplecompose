@@ -13,6 +13,7 @@ DEPLOY_BR = os.environ.get('DEPLOY_BR', 'stable')
 # Workaround cookiecutter no support of symlinks
 TEMPLATE = 'cookiecutter-simplecompose'
 SYMLINKS = {
+    'tox.ini': 'setup.cfg',
     'package.json': 'requirements/package.json',
     'package-lock.json': 'requirements/package-lock.json',
 }
