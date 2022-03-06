@@ -9,3 +9,4 @@
 !/lib/.empty
 /node_modules/
 .bash_history
+/dist

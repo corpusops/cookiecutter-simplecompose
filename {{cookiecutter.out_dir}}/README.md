@@ -1,30 +1,43 @@
 # tools for working with {{cookiecutter.name}}
 
-## configure
+## install as a python lib
+```bash
+pip install {{cookiecutter.lname}}
+```
+
+## Run in dev
+### Configure
 ```bash
 cp .env.dist .env
 cp .env.local.dist .env.local
 printf "USER_UID=$(id -u)\nUSER_GID=$(id -g)\n">>.env
 ```
 
-## build
+### Build
 ```bash
 eval $(egrep -hv '^#|^\s*$' .env .env.local|sed  -e "s/^/export /g"| sed -e "s/=/='/" -e "s/$/'/g"|xargs)
 COMPOSE_FILE="docker-compose.yml:docker-compose-build.yml" docker-compose build
 ```
 
-## run
+### Run
+
 ```bash
 docker-compose run --rm app bash
 ```
 
-In dev, with scripts mounted as volumes
 ```bash
-COMPOSE_FILE="docker-compose.yml:docker-compose-dev.yml" docker-compose run --rm app
+sed "/COMPOSE_FILE/d" .env
+echo COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml"
+docker-compose up -d --force-recreate
+docker-compose exec -U app bash
 ```
 
-## run tests
+### run tests
 ```bash
-docker-compose exec app tox
+sed "/COMPOSE_FILE/d" .env
+echo COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml:docker-compose-test.yml"
+docker-compose exec -U app app tox -e linting,coverage
 ```
 
+## Doc
+see also [USAGE](./USAGE.md) (or read below on pypi)

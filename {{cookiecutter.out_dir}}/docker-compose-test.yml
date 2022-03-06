@@ -1,0 +1,93 @@
+version: "3.8"
+{% set u = cookiecutter.lname.upper() %}
+{% set network = '{}_NETWORK'.format(u) %}
+x-bases:
+  x-base: &base
+    env_file: [.env, .env.local]
+    environment:
+      MAILCATCHER_PASSWORD: secret
+      MAILCATCHER_USER: mailcatcher
+      MH_API_BIND_ADDR: 0.0.0.0:8025
+      MH_AUTH_FILE: /home/mailhog/pw
+      MH_MAILDIR_PATH: /mails
+      MH_SMTP_BIND_ADDR: 0.0.0.0:1025
+      MH_STORAGE: maildir
+      MH_UI_BIND_ADDR: 0.0.0.0:8025
+      MH_UI_WEB_PATH: /mailcatcher
+      NGINX_REAL_IP_FROM: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ${{{network}}:-172.38.0}.0/12"
+      PASSWORD_ITERATIONS: '2000000'
+      PGPASSWD: "${PGPASSWD:-db}"
+      PGPASSWORD: "${PGPASSWD:-db}"
+      POSTGRES_DB: db
+      POSTGRES_HOST: db
+      POSTGRES_PASSWORD: db
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: db
+networks: {app_net: {driver: bridge, ipam: {config: [{subnet: "${{{network}}:-172.38.0}.0/24"}], driver: default}}}
+services:
+  setup:
+    <<: [ *base ]
+    entrypoint:
+    - bash
+    - -ec
+    - |-
+      cp -arvf /cops_helpers/* /helpers
+      f=/started_$$(echo $$POSTGRES_DB|sed -re "s![/:]!__!g")
+      hf=/started_hr
+      POSTGRES_STARTUP_TIMEOUT=$${POSTGRES_STARTUP_TIMEOUT:-45s}
+      HELPERS_TIMEOUT=$${HELPERS_TIMEOUT:-45s}
+      u="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@$$POSTGRES_HOST:$$POSTGRES_PORT/$$POSTGRES_DB"
+      rf() { for fl in $$f $$hf;do if [ -f $$fl ] ;then rm -f $$fl;fi;done; }
+      export PATH=/cops_helpers:/$$PATH
+      rf
+      echo "Try connection to pgsql: $$POSTGRES_DB & wait for db init" >&2
+      ( while true;do if ( echo select 1|psql -v ON_ERROR_STOP=1 $$u; );then touch $$f&&break;fi;done )&
+      echo "Try helpers availability" >&2
+      ( set +ex;while true;do frep --version && touch $$hf&&break;sleep 1;echo retryh;done; )&
+      set -x
+      dockerize -timeout 300s -wait "file:///$$f"
+      dockerize -timeout 900s -wait "file:///$$hf"
+      set +x
+      rf
+      while true;do printf "HTTP/1.1 200 OK\nContent-Length: 7\n\nstarted\n"|( nc -l -p 80 || /bin/true);done
+    image: corpusops/postgres:13
+    networks: {app_net: {ipv4_address: "${{{network}}:-172.38.0}.6"}}
+    volumes:
+    - helpers:/helpers:rw
+  db:
+    <<: [ *base ]
+    image: corpusops/postgres:13
+    networks: {app_net: {ipv4_address: "${{{network}}:-172.38.0}.4"}}
+    security_opt: [seccomp=unconfined]
+    volumes:
+    - db:/var/lib/postgresql/data:rw
+  mailcatcher:
+    <<: [ *base ]
+    entrypoint:
+    - sh
+    - -c
+    - 'chown mailhog /mails && pw=$$(MH_AUTH_FILE="" MailHog bcrypt "$${MAILCATCHER_PASSWORD:-mailcatcher}")
+      && echo "$${MAILCATCHER_USER:-mailcatcher}:$$pw" > $$MH_AUTH_FILE && su mailhog
+      -p -c MailHog'
+    hostname: mailcatcher
+    image: corpusops/mailhog
+    networks: {app_net: {ipv4_address: "${{{network}}:-172.38.0}.12"}}
+    user: root
+    volumes:
+    - mails:/mails:rw
+  app:
+    networks: {app_net: {}}
+    depends_on: [db]
+    entrypoint:
+    - bash
+    - -ec
+    - |-
+      /cops_helpers/dockerize -wait http://setup -timeout 60s
+      exec docker-entrypoint.sh
+    volumes:
+    - helpers:/helpers:rw
+volumes:
+  mails: {}
+  logs: {}
+  helpers: {}
+  db:

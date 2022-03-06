@@ -17,12 +17,13 @@ USER_OLD_GID="$(getent passwd $USER_NAME| cut -d: -f4)"
 export NO_ALL_FIXPERMS=${NO_ALL_FIXPERMS-}
 export NO_FIXPERMS=${NO_FIXPERMS-}
 SHELL_USER=${SHELL_USER:-$USER_NAME}
-FILES_EXTRA_DIRS="${FILES_EXTRA_DIRSDIRS:-}"
+FILES_EXTRA_DIRS="${FILES_EXTRA_DIRS:-}"
 FILES_DIRS="${FILES_DIRS:-"$USER_HOME $FILES_EXTRA_DIRS"}"
 USER_DIRS="${USER_DIRS:-"$USER_HOME"}"
 REQUIREMENTS="${REQUIREMENTS:-requirements/requirements.txt}"
 VERBOSE=""
 INIT_HOOKS_DIR=${INIT_HOOKS_DIR:-${USER_HOME}/bin}
+NO_CREATE_USER_DIRS=${NO_CREATE_USER_DIRS-}
 log() { echo "$@" >&2; }
 debuglog() { if [[ -n "$DEBUG" ]];then echo "$@" >&2;fi; }
 die() { log "$@";exit 1; }
@@ -54,11 +55,20 @@ if [[ -z $USER_UID ]] || [[ -z $USER_GID ]];then
     die 'set $USER_UID / $USER_GID'
 fi
 if [[ "${USER_OLD_UID}::${USER_OLD_GID}" != "${USER_UID}::${USER_GID}" ]];then
-    if !(getent group $USER_GID);then groupadd -g $USER_GID $USER_GROUP;fi
+    if !(getent group $USER_GID);then
+        groupadd="groupmod"
+        if !(getent group $USER_GROUP &>/dev/null);then groupadd="groupadd";fi
+        $groupadd -g $USER_GID $USER_GROUP
+    fi
     usermod -o -g $USER_GID -u $USER_UID $USER_NAME
     NO_TRANSFER=
 else
     NO_TRANSFER=1
+fi
+if [[ -z ${NO_CREATE_USER_DIRS} ]];then
+    for i in $FILES_DIRS;do
+        if [ ! -e $i ];then mkdir -p${VERBOSE} "$i";fi
+    done
 fi
 if [[ -z ${NO_ALL_FIXPERMS} ]];then
     if [[ -z "$NO_TRANSFER" ]];then
@@ -67,8 +77,10 @@ if [[ -z ${NO_ALL_FIXPERMS} ]];then
                 -and -not -uid $USER_UID )
     fi
     if [[ -z ${NO_FIXPERMS} ]];then
-        while read f;do chown -f${VERBOSE} $USER_UID:$USER_GID "$f";done < \
-            <( find $FILES_DIRS -not -uid $USER_UID )
+        for d in $FILES_DIRS;do if [ -e "$d" ];then
+            while read f;do chown -f${VERBOSE} $USER_UID:$USER_GID "$f";done < \
+                <( find $d -not -uid $USER_UID )
+        fi;done
     fi
 fi
 {% if cookiecutter.with_node %}

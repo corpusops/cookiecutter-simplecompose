@@ -1,6 +1,7 @@
 include HISTORY*
 include LICENSE*
 include README*
+include CHANGES*
 
 recursive-include src *
 recursive-exclude * __pycache__
