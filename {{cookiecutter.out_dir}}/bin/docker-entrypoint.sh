@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+rm -f /.started
 PYTHON=${PYTHON-python}
 {% if cookiecutter.with_node %}
 NO_NVM_INSTALL=${NO_NVM_INSTALL-1}
@@ -77,10 +78,8 @@ if [[ -z ${NO_ALL_FIXPERMS} ]];then
                 -and -not -uid $USER_UID )
     fi
     if [[ -z ${NO_FIXPERMS} ]];then
-        for d in $FILES_DIRS;do if [ -e "$d" ];then
-            while read f;do chown -f${VERBOSE} $USER_UID:$USER_GID "$f";done < \
-                <( find $d -not -uid $USER_UID )
-        fi;done
+        while read f;do chown -f${VERBOSE} $USER_UID:$USER_GID "$f";done < \
+            <( find $FILES_DIRS -not -uid $USER_UID )
     fi
 fi
 {% if cookiecutter.with_node %}
@@ -121,6 +120,7 @@ fi
 
 execute_hooks post $@
 
+touch /.started
 if [[ -z $@ ]];then
     exec gosu $SHELL_USER bash -lic "$START_COMMAND"
 elif [[ "$@" == "shell" ]];then
