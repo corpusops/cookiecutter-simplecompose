@@ -96,7 +96,7 @@ WORKDIR $USER_HOME
 
 # install node packages
 RUN bash -lc "set -ex \
-  && if !( echo $NVM_RELEASE|egrep -q ^latest$ );then NVM_URI=\"$NVM_URI/tags\";fi \
+  && if !( echo $NVM_RELEASE|grep -E -q ^latest$ );then NVM_URI=\"$NVM_URI/tags\";fi \
   && curl -sH \"Authorization: token $(echo $GITHUB_PAT|base64 -d)\" \
         \"$NVM_URI/$NVM_RELEASE\"|grep tag_name|cut -d '\"' -f 4 > /tmp/install/node_version \
   && curl -sL $NVM_DLURI/\$(cat /tmp/install/node_version)/install.sh -o /bin/install_nvm.sh \

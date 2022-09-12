@@ -30,7 +30,7 @@ git add -f local/regen.sh
 GITSCRIPT += """
 """.format(**locals())
 EGITSCRIPT = """
-sed="sed";if (uname | egrep -iq "darwin|bsd");then sed="gsed";fi
+sed="sed";if (uname | grep -E -iq "darwin|bsd");then sed="gsed";fi
 if !($sed --version);then echo $sed not avalaible;exit 1;fi
 set -x
 # strip whitespaces from compose
