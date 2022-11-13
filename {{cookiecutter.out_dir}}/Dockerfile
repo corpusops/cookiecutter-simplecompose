@@ -1,78 +1,164 @@
-FROM corpusops/ubuntu-bare:20.04
+# syntax=docker/dockerfile:1.3
+ARG BASE_IMAGE={{cookiecutter.base_image}}
+FROM $BASE_IMAGE AS base
+USER root
 WORKDIR /tmp/install
-ARG DEV_DEPENDENCIES_PATTERN='^#\s*dev dependencies' \
-    PY_VER=3.8 \
-    USER_NAME=app USER_UID=1000 USER_GROUP= USER_GID= \
-    USER_HOME=/w
-ARG PIP_SRC=$USER_HOME/lib
-ENV USER_NAME=$USER_NAME USER_GROUP=${USER_GROUP:-$USER_NAME} USER_UID=$USER_UID USER_GID=${USER_GID:-${USER_UID}} USER_HOME=$USER_HOME PY_VER=${PY_VER:-} PIP_SRC=$PIP_SRC
+ARG \
+{%- if cookiecutter.with_pyapp %}
+    PY_VER="3.8" \
+    USER_VENV="" \
+    PIP_SRC="" \
+{%- endif %}
+{%- if cookiecutter.with_node %}
+    NPM_TARGET="ci" \
+    NVM_DLURI="https://raw.githubusercontent.com/nvm-sh/nvm" \
+    NVM_RELEASE="latest" \
+    NVM_URI="https://api.github.com/repos/nvm-sh/nvm/releases" \
+    PACKAGEJSON_LOCATION="requirements" \
+{%- endif %}
+{%- if cookiecutter.with_pyapp %}
+    REQUIREMENTS="requirements/requirements.txt requirements/requirements-dev.txt" \
+{%- endif %}
+    APP_HOME="" \
+    DEV_DEPENDENCIES_PATTERN="^#\s*dev dependencies" \
+    GITHUB_PAT="NTA2N2MxYTQzNDgzOGRkYzZkZTczZTZlNjljZTFkNGEzNWZjMWMxOAo=" \
+    IMAGE_USER_RUNNER="root" \
+    USER_GID="" \
+    USER_GROUP="" \
+    USER_HOME="/w" \
+    USER_NAME="app" \
+    USER_UID="1000"
+ENV \
+    USER_NAME="$USER_NAME" \
+    USER_HOME="$USER_HOME" \
+    USER_UID="$USER_UID" \
+    USER_GID="${USER_GID:-$USER_UID}" \
+    USER_GROUP="${USER_GROUP:-$USER_NAME}" \
+    APP_HOME="${APP_HOME:-$USER_HOME}" \
+{%- if cookiecutter.with_pyapp %}
+    PY_VER="${PY_VER}" \
+{%- endif %}
+{%- if cookiecutter.with_node %}
+    NVM_RELEASE="$NVM_RELEASE" \
+    PACKAGEJSON_LOCATION="$PACKAGEJSON_LOCATION" \
+    REQUIREMENTS="$REQUIREMENTS" \
+{%- endif %}
+    IMAGE_USER_RUNNER="$IMAGE_USER_RUNNER"
+{%- if cookiecutter.with_pyapp %}
+ENV USER_VENV="${USER_VENV:-$APP_HOME/venv}"
+{%- endif%}
+ENV \
+{%- if cookiecutter.with_pyapp %}
+    PIP_SRC="${PIP_SRC:-$APP_HOME/lib}" \
+{%- endif%}
+    PATH="$USER_VENV/bin:/$APP_HOME/node_modules/.bin:$USER_HOME/bin:$APP_HOME/sbin:$APP_HOME/bin:$PATH"
 
 # system dependendencies (pkgs, users, etc)
 ADD apt*.txt ./
-RUN set -e \
-  && if !( getent group  $USER_NAME 2>/dev/null);then groupadd -g $USER_GID $USER_NAME;fi \
-  && if !( getent passwd $USER_NAME 2>/dev/null);then \
-    useradd -s /bin/bash -d $USER_HOME -m -u $USER_UID -g $USER_UID $USER_NAME;fi \
-  && sed -i -re "s/(python-?)[0-9]\.[0-9]+/\1$PY_VER/g" apt.txt \
-  && apt update && apt install -y $(egrep -v "^#" apt.txt) \
-  && mkdir -pv "$PIP_SRC" && chown $USER_NAME "$PIP_SRC" \
-  && printf "$USER_NAME ALL=(ALL) NOPASSWD:ALL\n">/etc/sudoers.d/app \
-  && : end
+RUN bash -exc ': \
+    \
+    && : "install packages" \
+    && apt-get update -qq \
+    && sed -re "/$DEV_DEPENDENCIES_PATTERN/,$ d" apt.txt|grep -vE "^\s*#"|tr "\n" " " > ${APP_HOME}/apt.txt \
+{%- if cookiecutter.with_pyapp %}
+    && sed -i -re "s/(python-?)[0-9]\.[0-9]+/\1$PY_VER/g" ${APP_HOME}/apt.txt \
+{%- endif %}
+    && apt-get install -qq -y $(cat ${APP_HOME}/apt.txt) \
+    && apt-get clean all && apt-get autoclean && rm -rf /var/lib/apt/lists/* \
+    && ( mkdir -pv ${APP_HOME}/{sbin,bin} || true ) \
+    && cp apt.txt ${APP_HOME}/ \
+    '
+RUN bash -exc ': \
+    && : "install users" \
+    && if ! ( getent group $USER_GROUP 2>/dev/null );then groupadd -g $USER_GID $USER_GROUP;fi \
+    && if ! ( getent passwd $USER_NAME 2>/dev/null );then useradd -s /bin/bash -d $USER_HOME -m -u $USER_UID -g $USER_UID $USER_NAME;fi \
+    && mkdir -pv ${APP_HOME}/{sbin,bin} \
+{%- if cookiecutter.with_sudo %}
+    && echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+{%- endif %}
+    '
+###
+# ADD HERE CUSTOM THINGS TO ADD TO BASEIMAGE WHICH ARE REQUIRED AT BUILDTIMe
+###
 
+FROM base AS appsetup
+RUN bash -exc ': \
+    && : "install dev packages" \
+    && cat apt.txt|grep -vE "^\s*#"|tr "\n" " " > ${APP_HOME}/apt.dev.txt \
+    && apt-get update -qq \
+    && apt-get install -qq -y $(cat ${APP_HOME}/app.dev.txt) \
+    && apt-get clean all && apt-get autoclean && rm -rf /var/lib/apt/lists/* \
+    '
 WORKDIR $USER_HOME
+{%- if cookiecutter.with_node %}
 
-{% if cookiecutter.with_node %}
-# add and install node
-ARG GITHUB_PAT="NTA2N2MxYTQzNDgzOGRkYzZkZTczZTZlNjljZTFkNGEzNWZjMWMxOAo="
-ARG NVM_RELEASE="latest"
-ARG NVMURI="https://api.github.com/repos/nvm-sh/nvm/releases"
-ARG NVMDLURI="https://raw.githubusercontent.com/nvm-sh/nvm"
-ENV PATH=$USER_HOME/node_modules/.bin:$USER_HOME/bin:$PATH
+# install node packages
 RUN bash -lc "set -ex \
-  && if !( echo $NVM_RELEASE|egrep -q ^latest$ );then NVMURI=\"$NVMURI/tags\";fi \
+  && if !( echo $NVM_RELEASE|egrep -q ^latest$ );then NVM_URI=\"$NVM_URI/tags\";fi \
   && curl -sH \"Authorization: token $(echo $GITHUB_PAT|base64 -d)\" \
-        \"$NVMURI/$NVM_RELEASE\"|grep tag_name|cut -d '\"' -f 4 > /tmp/install/node_version \
-  && curl -sL $NVMDLURI/\$(cat /tmp/install/node_version)/install.sh -o /bin/install_nvm.sh \
+        \"$NVM_URI/$NVM_RELEASE\"|grep tag_name|cut -d '\"' -f 4 > /tmp/install/node_version \
+  && curl -sL $NVM_DLURI/\$(cat /tmp/install/node_version)/install.sh -o /bin/install_nvm.sh \
   && chmod +x /bin/install_nvm.sh \
-  && gosu $USER_NAME install_nvm.sh"
-ADD --chown=app:app .nvmrc ./
-RUN gosu $USER_NAME bash -ic '. .bashrc && nvm install $(cat .nvmrc)'
+    "
+
+USER $USER_NAME
+ADD --chown=${USER_NAME}:${USER_GROUP} .nvmrc ./
+RUN bash -ic '/bin/install_nvm.sh && . .bashrc && set -e && nvm install $(cat .nvmrc)'
+
 # add and install node app
-ARG PACKAGEJSON_LOCATION=requirements
-ARG NPM_TARGET=ci
-ENV PACKAGEJSON_LOCATION=$PACKAGEJSON_LOCATION
-ADD --chown=app:app $PACKAGEJSON_LOCATION/*json ${PACKAGEJSON_LOCATION}/
-ADD --chown=app:app package*json ./
-RUN gosu $USER_NAME bash -ic 'set -e \
-    && nvm use \
+ADD --chown=${USER_NAME}:${USER_GROUP} $PACKAGEJSON_LOCATION/*json ${PACKAGEJSON_LOCATION}/
+ADD --chown=${USER_NAME}:${USER_GROUP} package*json ./
+RUN bash -ic ': \
+    && nvm use && set -e \
     && if !( grep -q '"name"' package-lock.json );then NPM_TARGET=install;fi \
     && npm $NPM_TARGET'
-{% endif %}
-# install python app
-ARG REQUIREMENTS=requirements/requirements.txt requirements/requirements-dev.txt
-ENV REQUIREMENTS=$REQUIREMENTS
-ADD --chown=app:app lib/ lib/
-ADD --chown=app:app src/ src/
-ADD --chown=app:app *.py *txt *md *in ./
-ADD --chown=app:app requirements/requirement*txt requirements/
-RUN bash -c 'set -e \
-  && for i in / /usr /usr/local;do \
-  ln -fsv $(which python${PY_VER}) $i/bin/python;done \
-  && python <(curl https://bootstrap.pypa.io/get-pip.py) \
-  && python -m pip install --no-cache -r <( cat $REQUIREMENTS ) \
-  && chown -Rf $USER_NAME .'
+USER root
+{%- endif %}
+{%- if cookiecutter.with_pyapp %}
 
-# final cleanup
-RUN \
-  set -ex \
-  && sed -i -re "s/(python-?)[0-9]\.[0-9]+/\1$PY_VER/g" apt.txt \
-  && apt install $(dpkg -l|awk '{print $2}'|grep -v -- -dev|egrep python.?-) \
-  && if $(egrep -q "${DEV_DEPENDENCIES_PATTERN}" apt.txt);then \
-    apt-get remove --auto-remove --purge \
-  $(sed "1,/${DEV_DEPENDENCIES_PATTERN}/ d" apt.txt|grep -v '^#'|tr "\n" " ");\
-  fi \
-  && rm -rf /var/lib/apt/lists/* /tmp/install
+# install python app
+ADD --chown=${USER_NAME}:${USER_GROUP} lib/ lib/
+ADD --chown=${USER_NAME}:${USER_GROUP} src/ src/
+ADD --chown=${USER_NAME}:${USER_GROUP} *.py *txt *md *in ./
+ADD --chown=${USER_NAME}:${USER_GROUP} requirements/requirement*txt requirements/
+RUN bash -ec ': \
+  && : "install pip" \
+  && python${PY_VER} <(curl https://bootstrap.pypa.io/get-pip.py) \
+  && python${PY_VER} -m pip install virtualenv \
+    '
+USER $USER_NAME
+RUN bash -ec ': \
+  && : "install app venv & deps" \
+  && python${PY_VER} -m virtualenv --python=python${PY_VER} $USER_VENV \
+  && python -m pip install --no-cache -r <( cat $REQUIREMENTS | grep -vE "^\s*#"  ) \
+  '
+USER root
+{%- endif %}
+ADD --chown=${USER_NAME}:${USER_GROUP} bin/  bin/
+
+FROM appsetup AS final
+###
+# ADD HERE CUSTOM BUILD PROJECT SETUP
+###
+RUN bash -exc ': \
+    && : "fixperms" \
+    && while read f;do chown -Rf $USER_NAME $f;done < <( find $USER_HOME $APP_HOME -not -uid ${USER_UID} ) \
+    '
+
+FROM base AS runner
+RUN --mount=type=bind,from=final,target=/s bash -exc ': \
+    && for i in /home/ $APP_HOME/ $USER_HOME/;do rsync -aAH --numeric-ids /s${i} ${i};done \
+    '
+WORKDIR $USER_HOME
+# image will drop privileges itself using gosu at the end of the entrypoint
 # run settings
-ADD --chown=app:app .git/ .git/
-ADD --chown=app:app bin/  bin/
+USER ${IMAGE_USER_RUNNER}
+###
+# ADD HERE CUSTOM RUNTIME PROJECT SETUP
+###
+
+{%- if cookiecutter.with_docker_git %}
+ADD --chown=${USER_NAME}:${USER_GROUP} .git .git/
+{%- endif %}
+CMD []
 ENTRYPOINT ["docker-entrypoint.sh"]

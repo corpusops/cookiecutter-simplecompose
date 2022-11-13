@@ -1,7 +1,10 @@
 version: "3.8"
-services:
-  app:
+x-images:
+  base: &base
     build:
       context: "."
       args:
-        PY_VER: {{cookiecutter.py_ver}}
+        PY_VER: "{{cookiecutter.py_ver}}"
+        BUILDKIT_INLINE_CACHE: "${BUILDKIT_INLINE_CACHE:-1}"
+services:
+  app: { <<: [ *base ] }

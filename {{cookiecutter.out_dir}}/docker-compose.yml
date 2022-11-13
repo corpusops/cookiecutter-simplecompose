@@ -1,9 +1,108 @@
 version: "3.8"
+{%- set u = cookiecutter.lname.upper() %}
+{%- set network = '{}_NETWORK'.format(u).replace('-', '_') %}
+{%- set netpref2 = cookiecutter.network.split('.')[:2]|join('.') %}
+{%- set netpref3 = cookiecutter.network.split('.')[:3]|join('.') %}
+{%- macro addlog(service) %}
+{%- if cookiecutter.with_logging %}
+    logging: {driver: syslog, options: {tag: "{{service}}", syslog-address: "tcp://${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-10514}"}}
+{%- endif %}
+{%- endmacro %}
+x-bases:
+  x-base: &base
+    env_file: [.env, .env.local]
+    environment:
+      BASE_IMAGE: "${BASE_IMAGE:-{{cookiecutter.base_image}}}"
+      NGINX_REAL_IP_FROM: "10.0.0.0/8 {{netpref2}}.0.0/12 192.168.0.0/16 {{'${'}}{{network}}:-{{netpref3}}.0/12}"
+      {% if cookiecutter.with_db -%}
+      PGPASSWD: "${PGPASSWD:-db}"
+      PGPASSWORD: "${PGPASSWD:-db}"
+      POSTGRES_DB: db
+      POSTGRES_HOST: db
+      POSTGRES_PASSWORD: db
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: db
+      {%- endif %}
+networks: {app_net: {driver: bridge, ipam: {config: [{subnet: "{{'${'}}{{network}}:-{{netpref3}}.0/24}"}], driver: default}}}
 services:
+{%- if cookiecutter.with_logging %}
+  log:
+    <<: [ *base ]
+    depends_on: []
+    image: corpusops/rsyslog
+    ports: ["${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-10514}:10514"]
+    # ensure no syslog log loop
+    logging: {driver: "json-file", options: {max-size: "10M", max-file: "50"}}
+    networks: {app_net: {ipv4_address: "${SYSLOG_IP_ADDRESS:-{{netpref3}}.252}"}}
+    volumes: [logs:/var/log/docker]
+{%- endif %}
   app:
+    <<: [ *base ]
     image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
+{{-addlog("app")}}
     environment:
       START_COMMAND: "${START_COMMAND:-sh -c 'while true;do echo sleep;sleep 65534;done'}"
     volumes:
     - "${DATA_FOLDER:-./data}:/w/data"
+    - helpers:/helpers:rw
     env_file: [.env, .env.local]
+    networks: {app_net: {ipv4_address: "${APP_IP_ADDRESS:-{{netpref3}}.2}"}}
+    entrypoint:
+    - bash
+    - -ec
+    - |-
+      export PATH=/helpers:$$PATH
+      dockerize -wait http://setup -timeout 60s
+      exec docker-entrypoint.sh $$@
+  {% if cookiecutter.with_db %}
+  db:
+    <<: [ *base ]
+{{-addlog("db")}}
+    depends_on: [db]
+    image: {{cookiecutter.db_image}}
+    networks: {app_net: {ipv4_address: "${DB_IP_ADDRESS:-{{netpref3}}.4}"}}
+    security_opt: [seccomp=unconfined]
+    volumes:
+    - db:/var/lib/postgresql/data:rw
+  {% endif %}
+  setup:
+    image: "${BASE_IMAGE:-{{cookiecutter.with_db and cookiecutter.db_image or cookiecutter.corpusops_image}}}"
+{{-addlog("setup")}}
+    <<: [ *base ]
+    entrypoint:
+    - bash
+    - -ec
+    - |-
+      cp -arvf /cops_helpers/* /helpers
+      export PATH=/cops_helpers:/$$PATH
+      hf=/started_hr
+      HELPERS_TIMEOUT=$${HELPERS_TIMEOUT:-45s}
+      {% if cookiecutter.with_db %}
+      f=/started_$$(echo $$POSTGRES_DB|sed -re "s![/:]!__!g")
+      {% endif %}
+      rf() { for fl in{%if cookiecutter.with_db %} $$f{% endif %} $$hf;do if [ -f $$fl ] ;then rm -f $$fl;fi;done; }
+      echo "Try helpers availability" >&2
+      ( set +ex;while true;do /helpers/frep --version && touch $$hf&&break;sleep 1;echo retryh;done; )&
+      rf
+      {% if cookiecutter.with_db -%}
+      POSTGRES_STARTUP_TIMEOUT=$${POSTGRES_STARTUP_TIMEOUT:-45s}
+      u="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@$$POSTGRES_HOST:$$POSTGRES_PORT/$$POSTGRES_DB"
+      echo "Try connection to pgsql: $$POSTGRES_DB & wait for db init" >&2
+      ( while true;do if ( echo select 1|psql -v ON_ERROR_STOP=1 $$u; );then touch $$f&&break;fi;done )&
+      dockerize -timeout 300s -wait "file:///$$f"
+      {%- endif%}
+      set -x
+      dockerize -timeout 900s -wait "file:///$$hf"
+      set +x
+      rf
+      while true;do printf "HTTP/1.1 200 OK\nContent-Length: 7\n\nstarted\n"|( nc -l -p 80 || /bin/true);done
+    networks: {app_net: {ipv4_address: "${SETUP_IP_ADDRESS:-{{netpref3}}.6}"}}
+    volumes:
+    - helpers:/helpers:rw
+volumes:
+  helpers: {}
+  db:
+{%- if cookiecutter.with_logging %}
+  logs:
+{%- endif %}
+

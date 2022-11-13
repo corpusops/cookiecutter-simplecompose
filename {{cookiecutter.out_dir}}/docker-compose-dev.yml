@@ -6,16 +6,19 @@ services:
       NO_PIP_INSTALL: "${NO_PIP_INSTALL-}"
       FILES_EXTRA_DIRS: "${DATA_FOLDER:-./data} ./.tox"
     volumes:
-    - "./requirements:/w/requirements"
-    - "./src:/w/src"
-    - "./lib:/w/lib"
+    - "./apt.txt:/w/apt.txt"
     - "${DATA_FOLDER:-./data}:/w/data"
     - "./bin:/w/bin"
     - "./git:/w/.git"
+{%- if cookiecutter.with_pyapp %}
+    - "./requirements:/w/requirements"
+    - "./lib:/w/lib"
+    - "./src:/w/src"
     - "./setup.py:/w/setup.py"
     - "./setup.cfg:/w/setup.cfg"
     - "./setup.cfg:/w/tox.ini"
-{% if cookiecutter.with_node %}
+{%- endif %}
+{%- if cookiecutter.with_node %}
     - "./node_modules:/w/node_modules"
     - "./.nvmrc:/w/.nvmrc"
-{%endif%}
+{%- endif%}

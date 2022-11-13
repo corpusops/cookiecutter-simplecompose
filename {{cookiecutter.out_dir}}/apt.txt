@@ -2,37 +2,38 @@
 openssh-client
 rsync
 # runtime dependencies
+{%- if cookiecutter.with_pyapp %}
 python3
 python3.8
 python3.8-distutils
 python3.8-lib2to3
+python3-distlib
+python3-distutils
+python3-pkg-resources
 libpython3.8
+libsoup2.4-1
+{% endif %}
 binutils
 ca-certificates
 curl
 gettext
-git
 less
-libllvm10
-libsoup2.4-1
-llvm-10
-lsb-release
 sudo
 tzdata
-vim
 wget
-python3.8-venv
-python3-virtualenv
-python3-distlib
-python3-pkg-resources
-python3-distutils
+# libllvm10
+# llvm-10
 # dev dependencies (after this line, all packages will be removed after build)
+lsb-release
 apt-utils
 build-essential
+git
 gpg
 libgcc-9-dev
 libstdc++-9-dev
 llvm-10-dev
+{%- if cookiecutter.with_pyapp %}
 python3.8-dev
 python3-dev
+{% endif %}
 software-properties-common

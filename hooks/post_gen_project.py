@@ -19,9 +19,11 @@ SYMLINKS = {
 }
 GITSCRIPT = """
 set -ex
-if [ ! -e .git ];then git init;fi
+if [ ! -e ../.git ] && [ ! -e .git ];then git init;fi
+if [ ! -e ../.git ];then
 git remote rm origin || /bin/true
 git remote add origin {{cookiecutter.git_project_url}}
+fi
 git add .
 git add -f local/regen.sh
 """
@@ -34,8 +36,14 @@ set -x
 # strip whitespaces from compose
 $sed -i -re 's/\s+$//g' docker-compose*.yml
 $sed -i -r '/^\s*$/d' docker-compose*.yml
+{% if not cookiecutter.with_githubactions %}
+rm -rf .github
+{% endif %}
 {% if not cookiecutter.with_node %}
 rm -f .nvmrc package*json requirements/package*json
+{% endif %}
+{% if not cookiecutter.with_pyapp %}
+rm -rf setup.* tox* requirements/*txt release.sh src lib
 {% endif %}
 """
 

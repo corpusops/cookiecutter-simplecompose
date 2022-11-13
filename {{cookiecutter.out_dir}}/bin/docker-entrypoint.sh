@@ -56,7 +56,7 @@ if [[ -z $USER_UID ]] || [[ -z $USER_GID ]];then
     die 'set $USER_UID / $USER_GID'
 fi
 if [[ "${USER_OLD_UID}::${USER_OLD_GID}" != "${USER_UID}::${USER_GID}" ]];then
-    if !(getent group $USER_GID);then
+    if !(getent group $USER_GID &>/dev/null);then
         groupadd="groupmod"
         if !(getent group $USER_GROUP &>/dev/null);then groupadd="groupadd";fi
         $groupadd -g $USER_GID $USER_GROUP
