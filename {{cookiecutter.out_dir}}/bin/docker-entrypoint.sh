@@ -18,6 +18,7 @@ USER_OLD_GID="$(getent passwd $USER_NAME| cut -d: -f4)"
 export NO_ALL_FIXPERMS=${NO_ALL_FIXPERMS-}
 export NO_FIXPERMS=${NO_FIXPERMS-}
 SHELL_USER=${SHELL_USER:-$USER_NAME}
+SHELL_WRAP=${SHELL_WRAP-}
 FILES_EXTRA_DIRS="${FILES_EXTRA_DIRS:-}"
 FILES_DIRS="${FILES_DIRS:-"$USER_HOME $FILES_EXTRA_DIRS"}"
 USER_DIRS="${USER_DIRS:-"$USER_HOME"}"
@@ -51,7 +52,9 @@ if ( ip -4 route list match 0/0 &>/dev/null );then
 fi
 
 cd ${USER_HOME-/workdir}
-if [[ -n $SDEBUG ]];then set -x;VERBOSE="v";fi
+execute_hooks pre $@
+SHELLVERBOSE=
+if [[ -n $SDEBUG ]];then set -x;VERBOSE="v";SHELLVERBOSE="x";fi
 if [[ -z $USER_UID ]] || [[ -z $USER_GID ]];then
     die 'set $USER_UID / $USER_GID'
 fi
@@ -122,10 +125,14 @@ execute_hooks post $@
 
 touch /.started
 if [[ -z $@ ]];then
-    exec gosu $SHELL_USER bash -lic "$START_COMMAND"
+    exec gosu $SHELL_USER bash -${SHELLVERBOSE}lic "$START_COMMAND"
 elif [[ "$@" == "shell" ]];then
-    exec gosu $SHELL_USER bash -li
+    exec gosu $SHELL_USER bash -${SHELLVERBOSE}li
 else
-    exec gosu $SHELL_USER bash -elic "$@"
+    if [[ -n $SHELL_WRAP ]];then
+        exec gosu $SHELL_USER bash -${SHELLVERBOSE}elic "$@"
+    else
+        exec gosu $SHELL_USER "$@"
+    fi
 fi
 # vim:set et sts=4 ts=4 tw=80:

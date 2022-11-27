@@ -10,7 +10,9 @@
     "py_ver": "3.8",
     "network": "172.38.0.0",
     "with_sudo": "y",
+    "main_branch": "main",
     "with_logging": "y",
+    "restart_policy": "unless-stopped",
     "with_db": "y",
     "with_pyapp": "y",
     "with_mailcatcher": "y",
@@ -30,6 +32,7 @@
     "ck_type": "{{cookiecutter.app_type}}",
     "docker_image": "{%if cookiecutter.docker_registry%}{{cookiecutter.docker_registry}}/{%endif%}{{cookiecutter.simple_docker_image}}",
     "db_image": "corpusops/postgres:13",
+	"release_mode": "pypi|docker",
     "corpusops_image": "corpusops/ubuntu-bare:20.04",
     "base_image": "{{cookiecutter.corpusops_image}}"
 }

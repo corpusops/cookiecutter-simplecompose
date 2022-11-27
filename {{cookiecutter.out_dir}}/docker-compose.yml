@@ -10,7 +10,7 @@ version: "3.8"
 {%- endmacro %}
 x-bases:
   x-base: &base
-    env_file: [.env, .env.local]
+    env_file: [.env]
     environment:
       BASE_IMAGE: "${BASE_IMAGE:-{{cookiecutter.base_image}}}"
       NGINX_REAL_IP_FROM: "10.0.0.0/8 {{netpref2}}.0.0/12 192.168.0.0/16 {{'${'}}{{network}}:-{{netpref3}}.0/12}"
@@ -37,15 +37,16 @@ services:
     volumes: [logs:/var/log/docker]
 {%- endif %}
   app:
+    depends_on: [setup, log]
     <<: [ *base ]
     image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
 {{-addlog("app")}}
     environment:
-      START_COMMAND: "${START_COMMAND:-sh -c 'while true;do echo sleep;sleep 65534;done'}"
+      START_COMMAND: "${START_COMMAND:-}"
     volumes:
     - "${DATA_FOLDER:-./data}:/w/data"
     - helpers:/helpers:rw
-    env_file: [.env, .env.local]
+    env_file: [.env]
     networks: {app_net: {ipv4_address: "${APP_IP_ADDRESS:-{{netpref3}}.2}"}}
     entrypoint:
     - bash
@@ -53,12 +54,13 @@ services:
     - |-
       export PATH=/helpers:$$PATH
       dockerize -wait http://setup -timeout 60s
-      exec docker-entrypoint.sh $$@
+      while read f;do d=/$$(dirname $$f)/$$(basename sys/$$f .frep);echo "Generating $$f" >&2;frep "sys/$$f:$$d" --overwrite;done < <(cd sys && find -type f -name "*frep")
+      exec docker-entrypoint.sh "$$@"
   {% if cookiecutter.with_db %}
   db:
+    depends_on: [log]
     <<: [ *base ]
 {{-addlog("db")}}
-    depends_on: [db]
     image: {{cookiecutter.db_image}}
     networks: {app_net: {ipv4_address: "${DB_IP_ADDRESS:-{{netpref3}}.4}"}}
     security_opt: [seccomp=unconfined]
@@ -66,6 +68,7 @@ services:
     - db:/var/lib/postgresql/data:rw
   {% endif %}
   setup:
+    depends_on: [log]
     image: "${BASE_IMAGE:-{{cookiecutter.with_db and cookiecutter.db_image or cookiecutter.corpusops_image}}}"
 {{-addlog("setup")}}
     <<: [ *base ]

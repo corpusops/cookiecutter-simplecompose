@@ -86,7 +86,7 @@ RUN bash -exc ': \
     && : "install dev packages" \
     && cat apt.txt|grep -vE "^\s*#"|tr "\n" " " > ${APP_HOME}/apt.dev.txt \
     && apt-get update -qq \
-    && apt-get install -qq -y $(cat ${APP_HOME}/app.dev.txt) \
+    && apt-get install -qq -y $(cat ${APP_HOME}/apt.dev.txt) \
     && apt-get clean all && apt-get autoclean && rm -rf /var/lib/apt/lists/* \
     '
 WORKDIR $USER_HOME
@@ -135,6 +135,7 @@ RUN bash -ec ': \
 USER root
 {%- endif %}
 ADD --chown=${USER_NAME}:${USER_GROUP} bin/  bin/
+ADD --chown=${USER_NAME}:${USER_GROUP} sys/  sys/
 
 FROM appsetup AS final
 ###

@@ -39,9 +39,11 @@ dvv rsync -aA \
     --exclude "local/*" --exclude lib \
     $( if [ -e ${out2}/.git ];then echo "--exclude .git";fi; ) \
     "$out/" "${out2}/"
+if [ -e "$out/lib" ];then
 dvv rsync -aA \
     $(if [[ -n $DEBUG ]];then echo "-v";fi )\
     "$out/lib/" "${out2}/lib/"
+fi
 
 ( cd "$out2" && git add -f local/regen.sh || /bin/true)
 dvv cp -f "$out/local/regen.sh" "$out2/local"

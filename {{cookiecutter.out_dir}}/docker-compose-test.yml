@@ -3,7 +3,7 @@ version: "3.8"
 {%- set network = '{}_NETWORK'.format(u) %}
 x-bases:
   x-base: &base
-    env_file: [.env, .env.local]
+    env_file: [.env]
     environment:
       TEST_MODE: "1"
       {% if cookiecutter.with_mailcatcher -%}

@@ -9,7 +9,8 @@ services:
     - "./apt.txt:/w/apt.txt"
     - "${DATA_FOLDER:-./data}:/w/data"
     - "./bin:/w/bin"
-    - "./git:/w/.git"
+    - "./.git:/w/.git"
+    - "./sys:/w/sys"
 {%- if cookiecutter.with_pyapp %}
     - "./requirements:/w/requirements"
     - "./lib:/w/lib"
