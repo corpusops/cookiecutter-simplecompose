@@ -58,6 +58,7 @@ ADD apt*.txt ./
 RUN bash -exc ': \
     \
     && : "install packages" \
+    && (mkdir ${APP_HOME} || true) \
     && apt-get update -qq \
     && sed -re "/$DEV_DEPENDENCIES_PATTERN/,$ d" apt.txt|grep -vE "^\s*#"|tr "\n" " " > ${APP_HOME}/apt.txt \
 {%- if cookiecutter.with_pyapp %}
@@ -76,6 +77,7 @@ RUN bash -exc ': \
 {%- if cookiecutter.with_sudo %}
     && echo "${USER_NAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
 {%- endif %}
+    && chown ${USER_NAME}:${USER_GROUP} ${APP_HOME} \
     '
 ###
 # ADD HERE CUSTOM THINGS TO ADD TO BASEIMAGE WHICH ARE REQUIRED AT BUILDTIMe

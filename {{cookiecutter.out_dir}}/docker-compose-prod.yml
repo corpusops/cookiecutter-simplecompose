@@ -3,16 +3,32 @@ version: "3.8"
 {%- set network = '{}_NETWORK'.format(u).replace('-', '_') %}
 {%- set netpref2 = cookiecutter.network.split('.')[:2]|join('.') %}
 {%- set netpref3 = cookiecutter.network.split('.')[:3]|join('.') %}
+{%- macro addlog(service) %}
+{%- if cookiecutter.with_logging %}
+    logging: {driver: syslog, options: {tag: "{{service}}", syslog-address: "tcp://${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-{{cookiecutter.log_port}}}"}}
+{%- endif %}
+{%- endmacro %}
 services:
 {%- if cookiecutter.with_logging %}
   log:
     restart: {{cookiecutter.restart_policy}}
+    # ensure no syslog log loop
+    logging: {driver: "json-file", options: {max-size: "10M", max-file: "50"}}
+    volumes: [logs:/var/log/docker]
+    ports: ["${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-{{cookiecutter.log_port}}:10514"]
 {%- endif %}
   app:
     restart: {{cookiecutter.restart_policy}}
-  {% if cookiecutter.with_db %}
+{{-addlog("app")}}
+{%-  if cookiecutter.with_db %}
   db:
     restart: {{cookiecutter.restart_policy}}
-  {% endif %}
+{{- addlog("db")}}
+{%- endif %}
   setup:
     restart: {{cookiecutter.restart_policy}}
+{{-addlog("setup")}}
+volumes:
+{%- if cookiecutter.with_logging %}
+  logs:
+{%- endif %}

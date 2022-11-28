@@ -1,5 +1,13 @@
 version: "3.8"
+x-images:
+  noop: &noop
+    depends_on: []
+    <<: [ *env ]
+    image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
+    command: []
+    entrypoint: [sh, -c 'while :;do sleep 50000;done']
 services:
+  log: {<<: [ *noop ]}
   app:
     environment:
       NO_NVM_INSTALL: "${NO_NVM_INSTALL-}"

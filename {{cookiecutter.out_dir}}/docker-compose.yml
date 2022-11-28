@@ -3,13 +3,8 @@ version: "3.8"
 {%- set network = '{}_NETWORK'.format(u).replace('-', '_') %}
 {%- set netpref2 = cookiecutter.network.split('.')[:2]|join('.') %}
 {%- set netpref3 = cookiecutter.network.split('.')[:3]|join('.') %}
-{%- macro addlog(service) %}
-{%- if cookiecutter.with_logging %}
-    logging: {driver: syslog, options: {tag: "{{service}}", syslog-address: "tcp://${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-10514}"}}
-{%- endif %}
-{%- endmacro %}
 x-bases:
-  x-base: &base
+  x-env: &env
     env_file: [.env]
     environment:
       BASE_IMAGE: "${BASE_IMAGE:-{{cookiecutter.base_image}}}"
@@ -23,31 +18,26 @@ x-bases:
       POSTGRES_PORT: '5432'
       POSTGRES_USER: db
       {%- endif %}
+  x-base: &base
+    <<: [ *env ]
 networks: {app_net: {driver: bridge, ipam: {config: [{subnet: "{{'${'}}{{network}}:-{{netpref3}}.0/24}"}], driver: default}}}
 services:
 {%- if cookiecutter.with_logging %}
   log:
-    <<: [ *base ]
-    depends_on: []
-    image: corpusops/rsyslog
-    ports: ["${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-10514}:10514"]
-    # ensure no syslog log loop
-    logging: {driver: "json-file", options: {max-size: "10M", max-file: "50"}}
-    networks: {app_net: {ipv4_address: "${SYSLOG_IP_ADDRESS:-{{netpref3}}.252}"}}
-    volumes: [logs:/var/log/docker]
+    image: "{{cookiecutter.rsyslog_image}}"
+    networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${SYSLOG_IP_ADDRESS:-252}"}}
 {%- endif %}
   app:
-    depends_on: [setup, log]
+    depends_on: [setup{% if cookiecutter.with_logging%}, log{%endif%}]
     <<: [ *base ]
     image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
-{{-addlog("app")}}
     environment:
       START_COMMAND: "${START_COMMAND:-}"
     volumes:
     - "${DATA_FOLDER:-./data}:/w/data"
     - helpers:/helpers:rw
     env_file: [.env]
-    networks: {app_net: {ipv4_address: "${APP_IP_ADDRESS:-{{netpref3}}.2}"}}
+    networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${APP_IP_ADDRESS:-2}"}}
     entrypoint:
     - bash
     - -ec
@@ -58,19 +48,17 @@ services:
       exec docker-entrypoint.sh "$$@"
   {% if cookiecutter.with_db %}
   db:
-    depends_on: [log]
+    depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
     <<: [ *base ]
-{{-addlog("db")}}
     image: {{cookiecutter.db_image}}
-    networks: {app_net: {ipv4_address: "${DB_IP_ADDRESS:-{{netpref3}}.4}"}}
+    networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${DB_IP_ADDRESS:-4}"}}
     security_opt: [seccomp=unconfined]
     volumes:
     - db:/var/lib/postgresql/data:rw
   {% endif %}
   setup:
-    depends_on: [log]
+    depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
     image: "${BASE_IMAGE:-{{cookiecutter.with_db and cookiecutter.db_image or cookiecutter.corpusops_image}}}"
-{{-addlog("setup")}}
     <<: [ *base ]
     entrypoint:
     - bash
@@ -99,13 +87,9 @@ services:
       set +x
       rf
       while true;do printf "HTTP/1.1 200 OK\nContent-Length: 7\n\nstarted\n"|( nc -l -p 80 || /bin/true);done
-    networks: {app_net: {ipv4_address: "${SETUP_IP_ADDRESS:-{{netpref3}}.6}"}}
+    networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${SETUP_IP_ADDRESS:-6}"}}
     volumes:
     - helpers:/helpers:rw
 volumes:
   helpers: {}
   db:
-{%- if cookiecutter.with_logging %}
-  logs:
-{%- endif %}
-

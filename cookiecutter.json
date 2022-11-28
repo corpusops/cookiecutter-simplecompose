@@ -33,6 +33,8 @@
     "docker_image": "{%if cookiecutter.docker_registry%}{{cookiecutter.docker_registry}}/{%endif%}{{cookiecutter.simple_docker_image}}",
     "db_image": "corpusops/postgres:13",
 	"release_mode": "pypi|docker",
+    "log_port": "10515",
     "corpusops_image": "corpusops/ubuntu-bare:20.04",
+	"rsyslog_image": "corpusops/rsyslog",
     "base_image": "{{cookiecutter.corpusops_image}}"
 }

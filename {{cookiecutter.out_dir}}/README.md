@@ -25,17 +25,34 @@ docker-compose run --rm app bash
 ```
 
 ```bash
-sed "/COMPOSE_FILE/d" .env
-echo COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml"
+sed -i -re "/COMPOSE_FILE/d" .env
+# either
+echo "COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml">>.env
+# or
+echo "COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml:docker-compose-build.yml">>.env
+###
 docker-compose up -d --force-recreate
 docker-compose exec -u app app bash
 ```
 
 ### run tests
 ```bash
-sed "/COMPOSE_FILE/d" .env
-echo COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml:docker-compose-test.yml"
+sed -i -re "/COMPOSE_FILE/d" .env
+echo "COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml:docker-compose-test.yml" >>.env
 docker-compose exec -U app app tox -e linting,coverage
+```
+
+### run prod
+```bash
+sed -i -re "/COMPOSE_FILE/d" .env
+echo "COMPOSE_FILE=docker-compose.yml:docker-compose-prod.yml" >> .env
+docker-compose exec -U app app tox -e linting,coverage
+```
+
+There is a [sample systemd unit](./sys/{{cookiecutter.name}}.service) to handle start at (re)boot and an [installer](./sys/install_systemd.sh) for it.
+
+```sh
+sudo -E ./sys/install_systemd.sh
 ```
 
 ## Doc
