@@ -46,7 +46,7 @@ docker-compose exec -U app app tox -e linting,coverage
 ```bash
 sed -i -re "/COMPOSE_FILE/d" .env
 echo "COMPOSE_FILE=docker-compose.yml:docker-compose-prod.yml" >> .env
-docker-compose exec -U app app tox -e linting,coverage
+docker-compose up -d --force-recreate
 ```
 
 There is a [sample systemd unit](./sys/{{cookiecutter.name}}.service) to handle start at (re)boot and an [installer](./sys/install_systemd.sh) for it.

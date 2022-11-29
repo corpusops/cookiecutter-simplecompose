@@ -15,7 +15,7 @@ services:
     # ensure no syslog log loop
     logging: {driver: "json-file", options: {max-size: "10M", max-file: "50"}}
     volumes: [logs:/var/log/docker]
-    ports: ["${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-{{cookiecutter.log_port}}:10514"]
+    ports: ["${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-{{cookiecutter.log_port}}}:10514"]
 {%- endif %}
   app:
     restart: {{cookiecutter.restart_policy}}
