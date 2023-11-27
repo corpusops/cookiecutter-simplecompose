@@ -164,7 +164,7 @@ USER ${IMAGE_USER_RUNNER}
 ###
 ### </ADD>
 
-{%- if cookiecutter.with_docker_git %}
+{%- if cookiecutter.include_git_in_dockerimage %}
 ADD --chown=${USER_NAME}:${USER_GROUP} .git .git/
 {%- endif %}
 CMD []

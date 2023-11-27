@@ -36,15 +36,22 @@ set -x
 # strip whitespaces from compose
 $sed -i -re 's/\s+$//g' docker-compose*.yml
 $sed -i -r '/^\s*$/d' docker-compose*.yml
+
+# block to sync with regen.sh
 {% if not cookiecutter.with_githubactions %}
 rm -rf .github
 {% endif %}
 {% if not cookiecutter.with_node %}
 rm -rf node_module* .nvmrc package*json requirements/package*json
 {% endif %}
+{% if not cookiecutter.db_image %}
+rm -rf src/dbutils.py
+{% endif %}
 {% if not cookiecutter.with_pyapp %}
 rm -rf setup.* tox* requirements/*txt release.sh src lib
 {% endif %}
+
+
 """
 
 MOTD = '''

@@ -63,15 +63,20 @@ add_submodules() {
     )
     cd "$W"
 }
+
+# block to sync with hook
 {% if not cookiecutter.with_githubactions %}
 rm -rf .github
 {% endif %}
 {% if not cookiecutter.with_node %}
 rm -rf node_module* .nvmrc package*json requirements/package*json
 {% endif %}
+{% if not cookiecutter.db_image %}
+rm -rf src/dbutils.py
+{% endif %}
 {% if not cookiecutter.with_pyapp %}
 rm -rf setup.* tox* requirements/*txt release.sh src lib
-{% endif %}   
+{% endif %}
 
 ( add_submodules )
 if [[ -z ${NO_RM-} ]];then dvv rm -rf "${out}";fi

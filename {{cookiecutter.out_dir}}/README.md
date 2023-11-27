@@ -9,37 +9,37 @@ pip install {{cookiecutter.lname}}
 ### Configure
 ```bash
 cp .env.dist .env
+sed -i -re "/USER_UID|USER_GID|COMPOSE_FILE/ d" .env
 printf "USER_UID=$(id -u)\nUSER_GID=$(id -g)\n">>.env
 ```
 
 ### Build
 ```bash
-eval $(grep -E -hv '^#|^\s*$' .env|sed  -e "s/^/export /g"| sed -e "s/=/='/" -e "s/$/'/g"|xargs)
 COMPOSE_FILE="docker-compose.yml:docker-compose-build.yml" docker-compose build
 ```
 
 ### Run
 
 ```bash
-docker-compose run --rm app bash
+docker-compose run --rm app -- bash
 ```
 
 ```bash
-sed -i -re "/COMPOSE_FILE/d" .env
+sed -i -re "/COMPOSE_FILE/ d" .env
 # either
 echo "COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml">>.env
 # or
 echo "COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml:docker-compose-build.yml">>.env
 ###
 docker-compose up -d --force-recreate
-docker-compose exec -u app app bash
+docker-compose exec -u app app -- bash
 ```
 
 ### run tests
 ```bash
 sed -i -re "/COMPOSE_FILE/d" .env
 echo "COMPOSE_FILE=docker-compose.yml:docker-compose-dev.yml:docker-compose-test.yml" >>.env
-docker-compose exec -U app app tox -e linting,coverage
+docker-compose exec -U app app -- tox -e linting,coverage
 ```
 
 ### run prod
@@ -53,6 +53,11 @@ There is a [sample systemd unit](./sys/{{cookiecutter.name}}.service) to handle 
 
 ```sh
 sudo -E ./sys/install_systemd.sh
+```
+
+## source env
+```sh
+eval $(grep -E -hv '^#|^\s*$' .env|sed  -e "s/^/export /g"| sed -e "s/=/='/" -e "s/$/'/g"|xargs)
 ```
 
 ## Doc

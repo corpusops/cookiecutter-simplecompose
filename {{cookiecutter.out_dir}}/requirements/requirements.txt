@@ -1,3 +1,11 @@
 # -e git+https://github.com/foo/foo#egg=foo
 requests
+{%- if 'mysql' in cookiecutter.db_image %}
+PyMySQL[rsa,ed25519]
+{%- endif %}
+{%- if 'post' in cookiecutter.db_image %}
+psycopg2-binary
+{%- endif %}
+sqlalchemy
+alembic
 -e .

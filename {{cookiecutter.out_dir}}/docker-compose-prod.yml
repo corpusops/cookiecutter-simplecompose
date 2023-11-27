@@ -12,7 +12,7 @@ services:
 {%- endif %}
   app:
     <<: [ *restart ]
-{%-  if cookiecutter.with_db %}
+{%-  if cookiecutter.db_image %}
   db:
     <<: [ *restart ]
 {%- endif %}

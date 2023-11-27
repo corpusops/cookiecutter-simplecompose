@@ -38,11 +38,11 @@ services:
     volumes:
     - mails:/mails:rw
   {% endif %}
-  {% if cookiecutter.with_db %}
+{%- if cookiecutter.db_image %}
   db:
     <<: [ *base ]
-  {% endif %}
-{% if cookiecutter.with_mailcatcher %}
+{%- endif %}
+{%- if cookiecutter.with_mailcatcher %}
 volumes:
   mails: {}
-{% endif %}
+{%- endif %}

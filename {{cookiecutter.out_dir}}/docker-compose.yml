@@ -1,5 +1,6 @@
 version: "3.8"
 {%- set u = cookiecutter.lname.upper() %}
+{%- set is_mysql = 'mysql' in cookiecutter.db_image or 'maria' in cookiecutter.db_image %}
 {%- set network = '{}_NETWORK'.format(u).replace('-', '_') %}
 {%- set netpref2 = cookiecutter.network.split('.')[:2]|join('.') %}
 {%- set netpref3 = cookiecutter.network.split('.')[:3]|join('.') %}
@@ -11,10 +12,11 @@ version: "3.8"
 x-bases:
   x-env: &env
     env_file: [.env]
-    environment:
+    environment: &env_env
       BASE_IMAGE: "${BASE_IMAGE:-{{cookiecutter.base_image}}}"
       NGINX_REAL_IP_FROM: "10.0.0.0/8 192.168.0.0/16 172.16.0.0/12{% if cookiecutter.network%} {{'${'}}{{network}}:-{{netpref3}}.0/12}{%endif%}"
-      {% if cookiecutter.with_db -%}
+{%- if cookiecutter.db_image %}
+{%- if 'post' in cookiecutter.db_image %}
       PGPASSWD: "${PGPASSWD:-db}"
       PGPASSWORD: "${PGPASSWD:-db}"
       POSTGRES_DB: db
@@ -22,7 +24,16 @@ x-bases:
       POSTGRES_PASSWORD: db
       POSTGRES_PORT: '5432'
       POSTGRES_USER: db
-      {%- endif %}
+{%- elif is_mysql %}
+      MYSQL_HOST: "${MYSQL_HOST:-db}"
+      MYSQL_PORT: "${MYSQL_PORT:-3306}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-db}"
+      MYSQL_USER: "${MYSQL_USER:-user}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-password}"
+      MYSQL_PWD: "${MYSQL_PASSWORD:-password}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_PASSWORD:-password}"
+{%- endif %}
+{%- endif %}
   x-base: &base
     <<: [ *env ]
 {%- if cookiecutter.network %}
@@ -44,6 +55,7 @@ services:
     image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
 {{-addlog("app")}}
     environment:
+      <<: [ *env_env ]
       START_COMMAND: "${START_COMMAND:-}"
     volumes:
     - "${DATA_FOLDER:-./data}:/w/data"
@@ -61,7 +73,7 @@ services:
       dockerize -wait http://setup -timeout 60s &>/dev/null
       while read f;do d=/$$(dirname $$f)/$$(basename sys/$$f .frep);echo "Generating $$f" >&2;frep "sys/$$f:$$d" --overwrite;done < <(cd sys && find -type f -name "*frep")
       exec docker-entrypoint.sh "$$@"
-  {% if cookiecutter.with_db %}
+{%- if cookiecutter.db_image %}
   db:
     <<: [ *base ]
     depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
@@ -72,12 +84,18 @@ services:
 {%- endif %}
     security_opt: [seccomp=unconfined]
     volumes:
+{%- if 'post' in cookiecutter.db_image %}
     - db:/var/lib/postgresql/data:rw
+{%- elif is_mysql %}
     - db:/var/lib/mysql:rw
-  {% endif %}
+{%- endif %}
+{%- endif %}
+{%- set depends = [] %}
+{%- if cookiecutter.with_logging%}{% set _ = depends.append('log') %}{%endif %}
+{%- if cookiecutter.db_image%}{% set _ = depends.append('db') %}{%endif %}
   setup:
-    depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
-    image: "${BASE_IMAGE:-{{cookiecutter.with_db and cookiecutter.db_image or cookiecutter.corpusops_image}}}"
+    depends_on: {{depends}}
+    image: "${SETUP_IMAGE:-{{cookiecutter.db_image and cookiecutter.db_image or cookiecutter.corpusops_image}}}"
     <<: [ *base ]
     entrypoint:
     - bash
@@ -87,20 +105,25 @@ services:
       export PATH=/cops_helpers:/$$PATH
       hf=/started_hr
       HELPERS_TIMEOUT=$${HELPERS_TIMEOUT:-45s}
-      {% if cookiecutter.with_db %}
+      {% if cookiecutter.db_image %}
       f=/started_$$(echo $$POSTGRES_DB|sed -re "s![/:]!__!g")
       {% endif %}
-      rf() { for fl in{%if cookiecutter.with_db %} $$f{% endif %} $$hf;do if [ -f $$fl ] ;then rm -f $$fl;fi;done; }
+      rf() { for fl in{%if cookiecutter.db_image %} $$f{% endif %} $$hf;do if [ -f $$fl ] ;then rm -f $$fl;fi;done; }
       echo "Try helpers availability" >&2
       ( set +ex;while true;do /helpers/frep --version && touch $$hf&&break;sleep 1;echo retryh;done; )&
       rf
-      {% if cookiecutter.with_db -%}
-      POSTGRES_STARTUP_TIMEOUT=$${POSTGRES_STARTUP_TIMEOUT:-45s}
+{%- if cookiecutter.db_image %}
+      DB_STARTUP_TIMEOUT=$${DB_STARTUP_TIMEOUT:-45s}
+{%- if 'post' in cookiecutter.db_image %}
       u="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@$$POSTGRES_HOST:$$POSTGRES_PORT/$$POSTGRES_DB"
       echo "Try connection to pgsql: $$POSTGRES_DB & wait for db init" >&2
       ( while true;do if ( echo select 1|psql -v ON_ERROR_STOP=1 $$u; );then touch $$f&&break;fi;done )&
+{%- elif is_mysql %}
+      echo "Try connection to mysql: $$MYSQL_DATABASE & wait for db init" >&2
+      ( while true;do if ( echo select 1|mysql $$MYSQL_DATABASE; );then touch $$f&&break;fi;done )&
+{%- endif %}
       dockerize -timeout 300s -wait "file:///$$f"
-      {%- endif%}
+{%- endif%}
       set -x
       dockerize -timeout 900s -wait "file:///$$hf"
       set +x
@@ -114,6 +137,6 @@ services:
     - helpers:/helpers:rw
 volumes:
   helpers: {}
-{%- if cookiecutter.with_db %}
+{%- if cookiecutter.db_image %}
   db:
 {%- endif %}
