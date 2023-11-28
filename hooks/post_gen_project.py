@@ -31,7 +31,7 @@ GITSCRIPT += """
 """.format(**locals())
 EGITSCRIPT = """
 sed="sed";if (uname | grep -E -iq "darwin|bsd");then sed="gsed";fi
-if !($sed --version);then echo $sed not avalaible;exit 1;fi
+if !($sed --version >/dev/null 2>&1);then echo $sed not avalaible;exit 1;fi
 set -x
 # strip whitespaces from compose
 $sed -i -re 's/\s+$//g' docker-compose*.yml
@@ -40,7 +40,7 @@ $sed -i -r '/^\s*$/d' docker-compose*.yml
 rm -rf .github
 {% endif %}
 {% if not cookiecutter.with_node %}
-rm -f .nvmrc package*json requirements/package*json
+rm -rf node_module* .nvmrc package*json requirements/package*json
 {% endif %}
 {% if not cookiecutter.with_pyapp %}
 rm -rf setup.* tox* requirements/*txt release.sh src lib

@@ -1,22 +1,26 @@
-#!/usr/bin/env bash
+#ode!/usr/bin/env bash
 # entrypoint is called either by
 # $0 shell
 # $0 without args, $START_COMMAND is sued
 # $0 with args, args are used in shell command
 #
 set -e
-rm -f /.started
+[[ ! -e flags ]] && mkdir /flags;rm -f /flags/.started
+{%- if cookiecutter.with_pyapp %}
 PYTHON=${PYTHON-python}
-{% if cookiecutter.with_node %}
-NO_NVM_INSTALL=${NO_NVM_INSTALL-1}
-VERBOSE_NVM_INSTALL=${VERBOSE_NVM_INSTALL-}
-{% endif %}
 NO_PIP_INSTALL=${NO_PIP_INSTALL-}
 PIP_DEVELOP_ARGS="${PIP_DEVELOP_ARGS:---no-deps --no-cache}"
-START_COMMAND="${START_COMMAND:-"sh -c 'while true;do sleep  65535;done'"}"
+REQUIREMENTS="${REQUIREMENTS:-requirements/requirements.txt}"
 VERBOSE_PIP_INSTALL=${VERBOSE_PIP_INSTALL-}
+{%- endif %}
+{%- if cookiecutter.with_node %}
+NO_NVM_INSTALL=${NO_NVM_INSTALL-1}
+VERBOSE_NVM_INSTALL=${VERBOSE_NVM_INSTALL-}
+{%- endif %}
+START_COMMAND="${START_COMMAND:-"sh -c 'while true;do sleep  65535;done'"}"
 USER_NAME=${USER_NAME:-$(ls -1 /home|head -n1)}
 USER_GROUP=${USER_NAME:-${USER_NAME}-group}
+APP_HOME="${APP_HOME:-/w}"
 USER_HOME="$(getent passwd $USER_NAME| cut -d: -f6)"
 USER_OLD_UID="$(getent passwd $USER_NAME| cut -d: -f3)"
 USER_OLD_GID="$(getent passwd $USER_NAME| cut -d: -f4)"
@@ -27,8 +31,7 @@ SHELL_USER=${SHELL_USER:-$USER_NAME}
 SHELL_WRAP=${SHELL_WRAP-}
 FILES_EXTRA_DIRS="${FILES_EXTRA_DIRS:-}"
 FILES_DIRS="${FILES_DIRS:-"$USER_HOME $FILES_EXTRA_DIRS"}"
-USER_DIRS="${USER_DIRS:-"$USER_HOME"}"
-REQUIREMENTS="${REQUIREMENTS:-requirements/requirements.txt}"
+USER_DIRS="${USER_DIRS:-"$USER_HOME $APP_HOME"}"
 VERBOSE=""
 SHELLVERBOSE=
 if [[ -n $SDEBUG ]];then set -x;VERBOSE="v";SHELLVERBOSE="x";fi
@@ -59,7 +62,7 @@ if ( ip -4 route list match 0/0 &>/dev/null );then
         | awk '{print $3" host.docker.internal"}' >> /etc/hosts
 fi
 
-cd ${USER_HOME-/workdir}
+cd "${APP_HOME}"
 execute_hooks pre $@
 if [[ -z $USER_UID ]] || [[ -z $USER_GID ]];then
     die 'set $USER_UID / $USER_GID'
@@ -75,6 +78,8 @@ if [[ "${USER_OLD_UID}::${USER_OLD_GID}" != "${USER_UID}::${USER_GID}" ]];then
 else
     NO_TRANSFER=1
 fi
+NO_TRANSFER=
+NO_FIXPERMS=
 if [[ -z ${NO_CREATE_USER_DIRS} ]];then
     for i in $FILES_DIRS;do
         if [ ! -e $i ];then mkdir -p${VERBOSE} "$i";fi
@@ -91,7 +96,7 @@ if [[ -z ${NO_ALL_FIXPERMS} ]];then
             <( find $FILES_DIRS -not -uid $USER_UID )
     fi
 fi
-{% if cookiecutter.with_node %}
+{%- if cookiecutter.with_node %}
 
 nvminstall() {
     NPM_TARGET=ci
@@ -108,7 +113,8 @@ if [[ -z "$NO_NVM_INSTALL" ]];then
     fi
     if !(nvminstall);then VERBOSE_NVM_INSTALL="1" nvminstall;fi
 fi
-{% endif %}
+{%- endif %}
+{%- if cookiecutter.with_pyapp %}
 # only reinstall editable requirements
 pipinstall() {
     end=""
@@ -126,19 +132,18 @@ if [[ -z $NO_PIP_INSTALL ]] && ( for i in $REQUIREMENTS;do \
     fi
     if !(pipinstall);then VERBOSE_PIP_INSTALL="1" pipinstall;fi
 fi
+{%- endif %}
 
 execute_hooks post $@
 
-touch /.started
-if ( echo "$@" | grep -E -q "^shell$" );then
-    exec gosu $SHELL_USER $SHELL -li
-elif [[ -z $@ ]] || ( echo "$@" | grep -E -q "^$SHELL|sh|bash|ash$" );then
+touch /flags/.started
+if ( echo "$@" | grep -E -q "^shell$" );then set -- $SHELL;fi
+if ( echo "$@" | grep -E -q '^(/[^ /]+/)+/?((z|ba|a)?sh)$' );then
+    SHELL_WRAP=
+fi
+if [[ -z $@ ]];then
     exec gosu $SHELL_USER $SHELL -${SHELLVERBOSE}lic "$START_COMMAND"
 else
-    if [[ -n $SHELL_WRAP ]];then
-        exec gosu $SHELL_USER $SHELL -${SHELLVERBOSE}elic "$@"
-    else
-        exec gosu $SHELL_USER "$@"
-    fi
+    exec gosu $SHELL_USER $( [[ -n $SHELL_WRAP ]] && echo "$SHELL -${SHELLVERBOSE}liec" ) "$@"
 fi
-# vim:set et sts=4 ts=4 tw=80:
+# vim:set et sts=4 ts=4 tw=0:

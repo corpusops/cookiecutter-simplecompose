@@ -3,12 +3,17 @@ version: "3.8"
 {%- set network = '{}_NETWORK'.format(u).replace('-', '_') %}
 {%- set netpref2 = cookiecutter.network.split('.')[:2]|join('.') %}
 {%- set netpref3 = cookiecutter.network.split('.')[:3]|join('.') %}
+{%- macro addlog(service) %}
+{%- if cookiecutter.with_logging %}
+    logging: {driver: syslog, options: {tag: "{{service}}", syslog-address: "tcp://${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-{{cookiecutter.log_port}}}"}}
+{%- endif %}
+{%- endmacro %}
 x-bases:
   x-env: &env
     env_file: [.env]
     environment:
       BASE_IMAGE: "${BASE_IMAGE:-{{cookiecutter.base_image}}}"
-      NGINX_REAL_IP_FROM: "10.0.0.0/8 {{netpref2}}.0.0/12 192.168.0.0/16 {{'${'}}{{network}}:-{{netpref3}}.0/12}"
+      NGINX_REAL_IP_FROM: "10.0.0.0/8 192.168.0.0/16 172.16.0.0/12{% if cookiecutter.network%} {{'${'}}{{network}}:-{{netpref3}}.0/12}{%endif%}"
       {% if cookiecutter.with_db -%}
       PGPASSWD: "${PGPASSWD:-db}"
       PGPASSWORD: "${PGPASSWD:-db}"
@@ -20,41 +25,55 @@ x-bases:
       {%- endif %}
   x-base: &base
     <<: [ *env ]
+{%- if cookiecutter.network %}
 networks: {app_net: {driver: bridge, ipam: {config: [{subnet: "{{'${'}}{{network}}:-{{netpref3}}.0/24}"}], driver: default}}}
+{%- endif %}
 services:
 {%- if cookiecutter.with_logging %}
   log:
     image: "{{cookiecutter.rsyslog_image}}"
+    logging: {driver: "json-file", options: {max-size: "10M", max-file: "50"}}
+    ports: ["${LOGGING_EXT_IP:-127.0.0.1}:${LOGGING_EXT_PORT:-{{cookiecutter.log_port}}}:10514"]
+{%- if cookiecutter.network %}
     networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${SYSLOG_IP_ADDRESS:-252}"}}
 {%- endif %}
+{%- endif %}
   app:
-    depends_on: [setup{% if cookiecutter.with_logging%}, log{%endif%}]
     <<: [ *base ]
+    depends_on: [setup{% if cookiecutter.with_logging%}, log{%endif%}]
     image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
+{{-addlog("app")}}
     environment:
       START_COMMAND: "${START_COMMAND:-}"
     volumes:
     - "${DATA_FOLDER:-./data}:/w/data"
     - helpers:/helpers:rw
-    env_file: [.env]
+{%- if cookiecutter.network %}
     networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${APP_IP_ADDRESS:-2}"}}
+{%- endif %}
     entrypoint:
     - bash
     - -ec
     - |-
+      if [[ -n $${SDEBUG-} ]];then set -x;fi
       export PATH=/helpers:$$PATH
-      dockerize -wait http://setup -timeout 60s
+      while ! ( for i in dockerize frep;do $$i --version||exit 1;done; );do sleep 0.5;done >/dev/null 2>&1
+      dockerize -wait http://setup -timeout 60s &>/dev/null
       while read f;do d=/$$(dirname $$f)/$$(basename sys/$$f .frep);echo "Generating $$f" >&2;frep "sys/$$f:$$d" --overwrite;done < <(cd sys && find -type f -name "*frep")
       exec docker-entrypoint.sh "$$@"
   {% if cookiecutter.with_db %}
   db:
-    depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
     <<: [ *base ]
+    depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
     image: {{cookiecutter.db_image}}
+{{- addlog("db")}}
+{%- if cookiecutter.network %}
     networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${DB_IP_ADDRESS:-4}"}}
+{%- endif %}
     security_opt: [seccomp=unconfined]
     volumes:
     - db:/var/lib/postgresql/data:rw
+    - db:/var/lib/mysql:rw
   {% endif %}
   setup:
     depends_on: [{% if cookiecutter.with_logging%}log{%endif%}]
@@ -87,9 +106,14 @@ services:
       set +x
       rf
       while true;do printf "HTTP/1.1 200 OK\nContent-Length: 7\n\nstarted\n"|( nc -l -p 80 || /bin/true);done
+{{-addlog("setup")}}
+{%- if cookiecutter.network %}
     networks: {app_net: {ipv4_address: "{{'${'}}{{network}}:-{{netpref3}}}.${SETUP_IP_ADDRESS:-6}"}}
+{%- endif %}
     volumes:
     - helpers:/helpers:rw
 volumes:
   helpers: {}
+{%- if cookiecutter.with_db %}
   db:
+{%- endif %}

@@ -27,7 +27,7 @@ fi
 if [ -e "$out" ];then vv rm -rf "$out";fi
 vv cookiecutter --no-input -o "$out" -f "$u" \
     {% for i, val in cookiecutter.items() %}{% if
-        i not in ['_template']%}{{i}}="{{val.replace('$', '\$')}}" \
+        not i.startswith('_')%}{{i}}="{{val.replace('$', '\$')}}" \
     {%endif%}{%endfor %} "$@"
 
 
@@ -63,6 +63,16 @@ add_submodules() {
     )
     cd "$W"
 }
+{% if not cookiecutter.with_githubactions %}
+rm -rf .github
+{% endif %}
+{% if not cookiecutter.with_node %}
+rm -rf node_module* .nvmrc package*json requirements/package*json
+{% endif %}
+{% if not cookiecutter.with_pyapp %}
+rm -rf setup.* tox* requirements/*txt release.sh src lib
+{% endif %}   
+
 ( add_submodules )
 if [[ -z ${NO_RM-} ]];then dvv rm -rf "${out}";fi
 echo "Your project is generated in: $out2" >&2

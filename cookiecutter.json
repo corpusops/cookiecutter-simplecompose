@@ -1,4 +1,5 @@
 {
+    "_extensions": ["e.version_compare", "e.regex_replace"],
     "name": "myapp",
     "author": "foo",
     "email": "foo@org.com",
@@ -7,7 +8,7 @@
     "eggname": "{{cookiecutter.lname}}",
     "infra_domain": "example.com",
     "simple_docker_image": "{{cookiecutter.git_ns.split('/')[0].lower()}}/{{cookiecutter.lname}}",
-    "py_ver": "3.8",
+    "py_ver": "3.10",
     "network": "172.38.0.0",
     "with_sudo": "y",
     "main_branch": "main",
@@ -32,9 +33,9 @@
     "ck_type": "{{cookiecutter.app_type}}",
     "docker_image": "{%if cookiecutter.docker_registry%}{{cookiecutter.docker_registry}}/{%endif%}{{cookiecutter.simple_docker_image}}",
     "db_image": "corpusops/postgres:13",
-	"release_mode": "pypi|docker",
+    "release_mode": "pypi|docker",
     "log_port": "10515",
-    "corpusops_image": "corpusops/ubuntu-bare:20.04",
-	"rsyslog_image": "corpusops/rsyslog",
+    "corpusops_image": "corpusops/ubuntu-bare:22.04",
+    "rsyslog_image": "corpusops/rsyslog",
     "base_image": "{{cookiecutter.corpusops_image}}"
 }

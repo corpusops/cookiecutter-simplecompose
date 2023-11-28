@@ -17,15 +17,16 @@ ARG \
     PACKAGEJSON_LOCATION="requirements" \
 {%- endif %}
 {%- if cookiecutter.with_pyapp %}
+    PIP_REQ=>=22 SETUPTOOLS_REQ=<60 \
     REQUIREMENTS="requirements/requirements.txt requirements/requirements-dev.txt" \
 {%- endif %}
-    APP_HOME="" \
+    APP_HOME="/w" \
     DEV_DEPENDENCIES_PATTERN="^#\s*dev dependencies" \
     GITHUB_PAT="NTA2N2MxYTQzNDgzOGRkYzZkZTczZTZlNjljZTFkNGEzNWZjMWMxOAo=" \
     IMAGE_USER_RUNNER="root" \
     USER_GID="" \
     USER_GROUP="" \
-    USER_HOME="/w" \
+    USER_HOME="/home/app" \
     USER_NAME="app" \
     USER_UID="1000"
 ENV \
@@ -51,7 +52,7 @@ ENV \
 {%- if cookiecutter.with_pyapp %}
     PIP_SRC="${PIP_SRC:-$APP_HOME/lib}" \
 {%- endif%}
-    PATH="$USER_VENV/bin:/$APP_HOME/node_modules/.bin:$USER_HOME/bin:$APP_HOME/sbin:$APP_HOME/bin:$PATH"
+    PATH="{% if cookiecutter.with_pyapp%}$USER_VENV/bin{%endif%}{% if cookiecutter.with_node%}:/$APP_HOME/node_modules/.bin{%endif%}:$USER_HOME/bin:$APP_HOME/sbin:$APP_HOME/bin:$PATH"
 
 # system dependendencies (pkgs, users, etc)
 ADD apt*.txt ./
@@ -60,14 +61,13 @@ RUN bash -exc ': \
     && : "install packages" \
     && (mkdir ${APP_HOME} || true) \
     && apt-get update -qq \
-    && sed -re "/$DEV_DEPENDENCIES_PATTERN/,$ d" apt.txt|grep -vE "^\s*#"|tr "\n" " " > ${APP_HOME}/apt.txt \
+    && sed -re "/$DEV_DEPENDENCIES_PATTERN/,$ d" apt.txt|grep -vE "^\s*#"|tr "\n" " " | xargs -n1 > ${APP_HOME}/apt.base.txt \
 {%- if cookiecutter.with_pyapp %}
-    && sed -i -re "s/(python-?)[0-9]\.[0-9]+/\1$PY_VER/g" ${APP_HOME}/apt.txt \
+    && sed -i -re "s/(python-?)[0-9]\.[0-9]+/\1$PY_VER/g" ${APP_HOME}/apt.base.txt \
 {%- endif %}
-    && apt-get install -qq -y $(cat ${APP_HOME}/apt.txt) \
+    && apt-get install -qq -y $(cat ${APP_HOME}/apt.base.txt) \
     && apt-get clean all && apt-get autoclean && rm -rf /var/lib/apt/lists/* \
     && ( mkdir -pv ${APP_HOME}/{sbin,bin} || true ) \
-    && cp apt.txt ${APP_HOME}/ \
     '
 RUN bash -exc ': \
     && : "install users" \
@@ -86,12 +86,12 @@ RUN bash -exc ': \
 FROM base AS appsetup
 RUN bash -exc ': \
     && : "install dev packages" \
-    && cat apt.txt|grep -vE "^\s*#"|tr "\n" " " > ${APP_HOME}/apt.dev.txt \
+    && cat apt.txt|grep -vE "^\s*#"|tr "\n" " " | xargs -n1 > ${APP_HOME}/apt.dev.txt \
     && apt-get update -qq \
     && apt-get install -qq -y $(cat ${APP_HOME}/apt.dev.txt) \
     && apt-get clean all && apt-get autoclean && rm -rf /var/lib/apt/lists/* \
     '
-WORKDIR $USER_HOME
+WORKDIR $APP_HOME
 {%- if cookiecutter.with_node %}
 
 # install node packages
@@ -121,7 +121,7 @@ USER root
 # install python app
 ADD --chown=${USER_NAME}:${USER_GROUP} lib/ lib/
 ADD --chown=${USER_NAME}:${USER_GROUP} src/ src/
-ADD --chown=${USER_NAME}:${USER_GROUP} *.py *txt *md *in ./
+ADD --chown=${USER_NAME}:${USER_GROUP} *.py *txt *md *.in ./
 ADD --chown=${USER_NAME}:${USER_GROUP} requirements/requirement*txt requirements/
 RUN bash -ec ': \
   && : "install pip" \
@@ -132,6 +132,7 @@ USER $USER_NAME
 RUN bash -ec ': \
   && : "install app venv & deps" \
   && python${PY_VER} -m virtualenv --python=python${PY_VER} $USER_VENV \
+  && pip install --upgrade pip${PIP_REQ} setuptools${SETUPTOOLS_REQ} \
   && python -m pip install --no-cache -r <( cat $REQUIREMENTS | grep -vE "^\s*#"  ) \
   '
 USER root
@@ -143,6 +144,7 @@ FROM appsetup AS final
 ###
 # ADD HERE CUSTOM BUILD PROJECT SETUP
 ###
+### </ADD>
 RUN bash -exc ': \
     && : "fixperms" \
     && while read f;do chown -Rf $USER_NAME $f;done < <( find $USER_HOME $APP_HOME -not -uid ${USER_UID} ) \
@@ -152,13 +154,15 @@ FROM base AS runner
 RUN --mount=type=bind,from=final,target=/s bash -exc ': \
     && for i in /home/ $APP_HOME/ $USER_HOME/;do rsync -aAH --numeric-ids /s${i} ${i};done \
     '
-WORKDIR $USER_HOME
+WORKDIR $APP_HOME
 # image will drop privileges itself using gosu at the end of the entrypoint
 # run settings
 USER ${IMAGE_USER_RUNNER}
+
 ###
 # ADD HERE CUSTOM RUNTIME PROJECT SETUP
 ###
+### </ADD>
 
 {%- if cookiecutter.with_docker_git %}
 ADD --chown=${USER_NAME}:${USER_GROUP} .git .git/

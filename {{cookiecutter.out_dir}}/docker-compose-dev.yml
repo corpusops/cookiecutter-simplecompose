@@ -4,14 +4,18 @@ x-images:
     depends_on: []
     image: "${DOCKER_IMAGE:-{{cookiecutter.docker_image}}}"
     command: []
-    entrypoint: [sh, -c 'while :;do sleep 50000;done']
+    entrypoint: [sh, -c, 'while :;do sleep 50000;done']
 services:
   log: {<<: [ *noop ]}
   app:
     environment:
+{%- if cookiecutter.with_node %}
       NO_NVM_INSTALL: "${NO_NVM_INSTALL-}"
+{%- endif %}
+{%- if cookiecutter.with_pyapp %}
       NO_PIP_INSTALL: "${NO_PIP_INSTALL-}"
-      FILES_EXTRA_DIRS: "${DATA_FOLDER:-./data} ./.tox"
+{%- endif %}
+      FILES_EXTRA_DIRS: "${DATA_FOLDER:-./data}{%if cookiecutter.with_pyapp%} ./.tox{%endif%}"
     volumes:
     - "./apt.txt:/w/apt.txt"
     - "${DATA_FOLDER:-./data}:/w/data"
@@ -30,3 +34,6 @@ services:
     - "./node_modules:/w/node_modules"
     - "./.nvmrc:/w/.nvmrc"
 {%- endif%}
+    # preserve history files in dev
+    - "${HOMES_FOLDER:-./local/homes}/root:/root"
+    - "${HOMES_FOLDER:-./local/homes}/app:/home/app"

@@ -1,18 +1,20 @@
+{% set is_22 = cookiecutter.corpusops_image.split(':')[1] | version_compare('22.04', '>=') %}
+{% set llvmver = is_22 and '14' or '10' %}
 # for teleport, do not remove
 openssh-client
 rsync
 # runtime dependencies
 {%- if cookiecutter.with_pyapp %}
 python3
-python3.8
-python3.8-distutils
-python3.8-lib2to3
+python{{cookiecutter.py_ver}}
+python{{cookiecutter.py_ver}}-distutils
+python{{cookiecutter.py_ver}}-lib2to3
 python3-distlib
 python3-distutils
 python3-pkg-resources
-libpython3.8
+libpython{{cookiecutter.py_ver}}
 libsoup2.4-1
-{% endif %}
+{%- endif %}
 binutils
 ca-certificates
 curl
@@ -21,8 +23,8 @@ less
 sudo
 tzdata
 wget
-# libllvm10
-# llvm-10
+# libllvm{{llvmver}}
+# llvm-{{llvmver}}
 # dev dependencies (after this line, all packages will be removed after build)
 lsb-release
 apt-utils
@@ -31,9 +33,9 @@ git
 gpg
 libgcc-9-dev
 libstdc++-9-dev
-llvm-10-dev
+llvm-{{llvmver}}-dev
 {%- if cookiecutter.with_pyapp %}
-python3.8-dev
+python{{cookiecutter.py_ver}}-dev
 python3-dev
-{% endif %}
+{%- endif %}
 software-properties-common

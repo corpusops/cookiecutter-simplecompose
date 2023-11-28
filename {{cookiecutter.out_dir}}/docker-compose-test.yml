@@ -17,7 +17,7 @@ x-bases:
       MH_UI_BIND_ADDR: 0.0.0.0:8025
       MH_UI_WEB_PATH: /mailcatcher
       {%- endif %}
-services:   
+services:
   app:
     <<: [ *base ]
   setup:
@@ -42,5 +42,7 @@ services:
   db:
     <<: [ *base ]
   {% endif %}
+{% if cookiecutter.with_mailcatcher %}
 volumes:
   mails: {}
+{% endif %}
